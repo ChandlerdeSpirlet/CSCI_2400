@@ -1,0 +1,3 @@
+401516 for pop
+401510 for movq
+0x25095d88 - cookie

