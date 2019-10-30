@@ -101,7 +101,7 @@ applyFilter(struct Filter *filter, cs1300bmp *input, cs1300bmp *output)
 
   output -> width = input -> width;
   output -> height = input -> height;
-  
+  int div = filter -> getDivisor();
   long int width = (input -> width) - 1;
   long int height = (input -> height) - 1;
   int filterSize = filter -> getSize();
@@ -123,7 +123,7 @@ applyFilter(struct Filter *filter, cs1300bmp *input, cs1300bmp *output)
 	}
 	
 	output -> color[plane][row][col] = 	
-	  output -> color[plane][row][col] / filter -> getDivisor();
+	  output -> color[plane][row][col] / div; //filter -> getDivisor();
 
 	if ( output -> color[plane][row][col]  < 0 ) {
 	  output -> color[plane][row][col] = 0;
