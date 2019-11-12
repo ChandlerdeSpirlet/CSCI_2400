@@ -3,6 +3,7 @@
 #include <iostream>
 #include <fstream>
 #include "Filter.h"
+#include <omp.h>
 
 using namespace std;
 
@@ -17,6 +18,7 @@ double applyFilter(Filter *filter, cs1300bmp *input, cs1300bmp *output);
 int
 main(int argc, char **argv)
 {
+    #pragma omp parallel num_threads(8)
 
   if ( argc < 2) {
     fprintf(stderr,"Usage: %s filter inputfile1 inputfile2 .... \n", argv[0]);
@@ -99,128 +101,150 @@ applyFilter(struct Filter *filter, cs1300bmp *input, cs1300bmp *output)
 
     cycStart = rdtscll();
 
+    //create local variables instead of dereferenced memory
     output -> width = input -> width;
     output -> height = input -> height;
+    
+    //calculate outside loop
     unsigned int height = input -> height - 1;
     unsigned int width = input -> width - 1;
-    int t, k, r;
+    
+    //t0 - t2 correspond to the unrolling of the plane loop. plane = 0 => t0 ...
+    int t0, t1, t2, k, r; 
     unsigned int a, b, c, d;
+    
+    //array to hold filter values
     int temp_filter[3][3];
+    
+    //move getDivisor() outside of loop
     unsigned int div = filter -> getDivisor();
     
-    for (int j = 0; j < 3; j++){
+    //New loop to parse the x, y filter values of the filter outside main loop
+    for (int j = 0; j < 3; j++){ 
         for (int i = 0; i < 3; i++){
             temp_filter[i][j] = filter -> get(i, j);
         }
     }
     
     if (temp_filter[1][0] == 0 && temp_filter[1][1] == 0 && temp_filter[1][2] == 0){
-        for (int plane = 0; plane < 3; plane++){
-            for (int row = height - 1; row != 0; row--){
-                a = row - 1;
-                for (int col = width - 1; col != 0; col--){
-                    b = col - 1;
-                    t = 0;
-                    k = 0;
-                    r = 0;
+        for (int row = height - 1; row != 0; row--){
+            a = row - 1;
+            for (int col = width - 1; col != 0; col--){
+                b = col - 1;
+                k = 0;
+                r = 0;
+                //t0 - t2 in Stride-1 
+                t0 = 0;
+                t1 = 0;
+                t2 = 0;
                     
-                    for (int j = 0; j < 3; j++){
-                        c = b + j;
-                        t += (input -> color[plane][a][c] * temp_filter[0][j]) + 
-                            (input -> color[plane][a + 2][c] * temp_filter[2][j]);
-                    }
-                    
-                    if (t < 0){
-                        t = 0;
-                    }
-                    if (t > 255){
-                        t = 255;
-                    }
-                    output -> color[plane][row][col] = t;
+                for (int j = 0; j < 3; j++){
+                    c = b + j;
+                    t0 += (input -> color[0][a][c] * temp_filter[0][j]) + 
+                        (input -> color[0][a + 2][c] * temp_filter[2][j]);
+                    t1 += (input -> color[1][a][c] * temp_filter[0][j]) + 
+                            (input -> color[1][a + 2][c] * temp_filter[2][j]);
+                    t2 += (input -> color[2][a][c] * temp_filter[0][j]) + 
+                        (input -> color[2][a + 2][c] * temp_filter[2][j]);
                 }
+                //Use nested conditionals instead of if statements
+                t0 = t0 < 0 ? 0 : t0 > 255 ? 255 : t0;
+                t1 = t1 < 0 ? 0 : t1 > 255 ? 255 : t1;
+                t2 = t2 < 0 ? 0 : t2 > 255 ? 255 : t2;
+                output -> color[0][row][col] = t0;
+                output -> color[1][row][col] = t1;
+                output -> color[2][row][col] = t2;
             }
         }
     } else if (temp_filter[0][0] == 1 && temp_filter[0][1] == 1 && temp_filter[0][2] == 1 &&
               temp_filter[1][0] == 1 && temp_filter[1][1] == 1 && temp_filter[1][2] == 1 &&
               temp_filter[2][0] == 1 && temp_filter[2][1] == 1 && temp_filter[2][2] == 1){
-        for (int plane = 0; plane < 3; plane++){
-            for (int row = height - 1; row != 0; row--){
-                a = row - 1;
-                for (int col = width - 1; col != 0; col--){
-                    b = col - 1;
-                    t = 0;
+        for (int row = height - 1; row != 0; row--){
+            a = row - 1;
+            for (int col = width - 1; col != 0; col--){
+                b = col - 1;
+                t0 = 0;
+                t1 = 0;
+                t2 = 0;
                     
-                    for (int i = 0; i < 3; i++){
-                        d = a + i;
-                        for (int j = 0; j < 3; j++){
-                            t += (input -> color[plane][d][b + j]);
-                        }
+                for (int i = 0; i < 3; i++){
+                    d = a + i;
+                    for (int j = 0; j < 3; j++){
+                        t0 += (input -> color[0][d][b + j]);
+                        t1 += (input -> color[1][d][b + j]);
+                        t2 += (input -> color[2][d][b + j]);
                     }
-                    
-                    t /= div;
-                    
-                    if (t < 0){
-                        t = 0;
-                    }
-                    if (t > 255){
-                        t = 255;
-                    }
-                    output -> color[plane][row][col] = t;
                 }
+                    
+                t0 /= div;
+                t1 /= div;
+                t2 /= div;
+                    
+                t0 = t0 < 0 ? 0 : t0 > 255 ? 255 : t0;
+                t1 = t1 < 0 ? 0 : t1 > 255 ? 255 : t1;
+                t2 = t2 < 0 ? 0 : t2 > 255 ? 255 : t2;
+                output -> color[0][row][col] = t0;
+                output -> color[1][row][col] = t1;
+                output -> color[2][row][col] = t2;
             }
         }
     } else if (div == 1) {
-        for (int plane = 0; plane < 3; plane++){
-            for (int row = height - 1; row != 0; row--){
-                a = row - 1;
-                for (int col = width - 1; col != 0; col--){
-                    b = col - 1;
-                    t = 0;
+        for (int row = height - 1; row != 0; row--){
+            a = row - 1;
+            for (int col = width - 1; col != 0; col--){
+                b = col - 1;
+                t0 = 0;
+                t1 = 0;
+                t2 = 0;
                     
-                    for (int i = 0; i < 3; i++){
-                        d = a + i;
-                        for (int j = 0; j < 3; j++){
-                            c = b + j;
-                            t += (input -> color[plane][d][c] * temp_filter[i][j]);
-                        }
+                for (int i = 0; i < 3; i++){
+                    d = a + i;
+                    for (int j = 0; j < 3; j++){
+                        c = b + j;
+                        t0 += (input -> color[0][d][c] * temp_filter[i][j]);
+                        t1 += (input -> color[1][d][c] * temp_filter[i][j]);
+                        t2 += (input -> color[2][d][c] * temp_filter[i][j]);
                     }
-                    
-                    if (t < 0){
-                        t = 0;
-                    }
-                    if (t > 255){
-                        t = 255;
-                    }
-                    output -> color[plane][row][col] = t;
                 }
+                    
+                t0 = t0 < 0 ? 0 : t0 > 255 ? 255 : t0;
+                t1 = t1 < 0 ? 0 : t1 > 255 ? 255 : t1;
+                t2 = t2 < 0 ? 0 : t2 > 255 ? 255 : t2;
+                output -> color[0][row][col] = t0;
+                output -> color[1][row][col] = t1;
+                output -> color[2][row][col] = t2;
             }
         }
     } else {
-        for (int plane = 0; plane < 3; plane++){
-            for (int row = height - 1; row != 0; row--){
-                a = row - 1;
-                for (int col = width - 1; col != 0; col--){
-                    b = col - 1;
-                    t = 0;
-                    k = 0;
-                    r = 0;
+        for (int row = height - 1; row != 0; row--){
+            a = row - 1;
+            for (int col = width - 1; col != 0; col--){
+                b = col - 1;
+                t0 = 0;
+                t1 = 0;
+                t2 = 0;
+                k = 0;
+                r = 0;
                     
-                    for (int j = 0; j < 3; j++){
-                        c = b + j;
-                        for (int i = 0; i < 3; i++){
-                            d = a + i;
-                            t += (input -> color[plane][d][c] * temp_filter[i][j]);
-                        }
+                for (int j = 0; j < 3; j++){
+                    c = b + j;
+                    for (int i = 0; i < 3; i++){
+                        d = a + i;
+                        t0 += (input -> color[0][d][c] * temp_filter[i][j]);
+                        t1 += (input -> color[1][d][c] * temp_filter[i][j]);
+                        t2 += (input -> color[2][d][c] * temp_filter[i][j]);
                     }
-                    t = t / div;
-                    if (t < 0){
-                        t = 0;
-                    }
-                    if (t > 255){
-                        t = 255;
-                    }
-                    output -> color[plane][row][col] = t;
                 }
+                t0 /= div;
+                t1 /= div;
+                t2 /= div;
+                
+                t0 = t0 < 0 ? 0 : t0 > 255 ? 255 : t0;
+                t1 = t1 < 0 ? 0 : t1 > 255 ? 255 : t1;
+                t2 = t2 < 0 ? 0 : t2 > 255 ? 255 : t2;
+                output -> color[0][row][col] = t0;
+                output -> color[1][row][col] = t1;
+                output -> color[2][row][col] = t2;
             }
         }
     }

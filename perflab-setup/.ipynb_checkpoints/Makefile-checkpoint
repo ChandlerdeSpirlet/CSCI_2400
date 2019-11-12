@@ -6,7 +6,7 @@ CXX	=g++
 ## Use our standard compiler flags for the course...
 ## You can try changing these flags to improve performance.
 ##
-CXXFLAGS= -m32 -static -funroll-loops -Ofast -msse2
+CXXFLAGS= -m32 -static -O3 -msse2 -fopenmp
 
 goals: judge
 	@echo "Done"
