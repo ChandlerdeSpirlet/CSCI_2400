@@ -126,20 +126,20 @@ applyFilter(struct Filter *filter, cs1300bmp *input, cs1300bmp *output)
         }
     }
     
-    if (temp_filter[1][0] == 0 && temp_filter[1][1] == 0 && temp_filter[1][2] == 0){
+    if (temp_filter[1][0] == 0 && temp_filter[1][1] == 0 && temp_filter[1][2] == 0){ //for hline filter
         for (int row = height - 1; row != 0; row--){
             a = row - 1;
             for (int col = width - 1; col != 0; col--){
-                b = col - 1;
+                b = col - 1; //temporal locality
                 k = 0;
                 r = 0;
-                //t0 - t2 in Stride-1 
+                //t0 - t2 in Stride-1. Also use temporal locality, used in next loop
                 t0 = 0;
                 t1 = 0;
                 t2 = 0;
                     
                 for (int j = 0; j < 3; j++){
-                    c = b + j;
+                    c = b + j; //spacial locality, j is used in each t value
                     t0 += (input -> color[0][a][c] * temp_filter[0][j]) + 
                         (input -> color[0][a + 2][c] * temp_filter[2][j]);
                     t1 += (input -> color[1][a][c] * temp_filter[0][j]) + 
@@ -156,7 +156,7 @@ applyFilter(struct Filter *filter, cs1300bmp *input, cs1300bmp *output)
                 output -> color[2][row][col] = t2;
             }
         }
-    } else if (temp_filter[0][0] == 1 && temp_filter[0][1] == 1 && temp_filter[0][2] == 1 &&
+    } else if (temp_filter[0][0] == 1 && temp_filter[0][1] == 1 && temp_filter[0][2] == 1 && //for avg filter
               temp_filter[1][0] == 1 && temp_filter[1][1] == 1 && temp_filter[1][2] == 1 &&
               temp_filter[2][0] == 1 && temp_filter[2][1] == 1 && temp_filter[2][2] == 1){
         for (int row = height - 1; row != 0; row--){
