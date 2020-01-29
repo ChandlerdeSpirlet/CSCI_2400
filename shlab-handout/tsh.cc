@@ -439,25 +439,9 @@ void sigtstp_handler(int sig)
  *********************/
 
 
-/*********************
+/******************
 * Wrapper Functions 
-*********************/
-
-//Signal - wrapper for the sigaction function
-/*
-handler_t *Signal (int signum, handler_t *handler){
-  struct sigaction action, old_action;
-  
-  action.sa_handler = handler;
-  SigEmptySet(&action.sa_mask); //block sigs of type being handled
-  action.sa_flags = SA_RESTART; //restarts syscalls if possible
-  
-  if (sigaction(signum, &action, &old_action) < 0){
-    unix_error("Signal error");
-  }
-  return (old_action.sa_handler);
-}
-*/
+*******************/
 
 //Wrapper function for SigEmptySet system call
 void SigEmptySet (sigset_t *mask){
